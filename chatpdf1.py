@@ -4,11 +4,16 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import google.generativeai as genai
-from langchain.vectorstores import FAISS
+from langchain_community.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
+from selenium import webdriver
+from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
+from bs4 import BeautifulSoup
+import time
 
 # Load environment variables
 load_dotenv()
@@ -48,6 +53,7 @@ def get_conversational_chain():
     """
     model = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3)
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
+    
     chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
     return chain
 
@@ -57,7 +63,8 @@ def user_input(user_question):
     new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     docs = new_db.search(query=user_question, search_type="similarity", k=10)  # Retrieve the top 10 documents from the index
     chain = get_conversational_chain()
-    response = chain({"input_documents": docs, "question": user_question}, return_only_outputs=True)
+    
+    response = chain.invoke({"input_documents": docs, "question": user_question})
     st.write("Reply: ", response["output_text"])
 
 # Chat with PDF functionality
@@ -77,14 +84,45 @@ def chat_with_pdf():
             get_vector_store(text_chunks)
             st.success("Done")
 
-# Chat with Webpage (placeholder)
+# Function to scrape webpage content using Selenium and BeautifulSoup
+def get_webpage_text(url):
+    # Automatically manage ChromeDriver using ChromeDriverManager
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service)
+
+    # Load the webpage
+    driver.get(url)
+
+    # Allow the page to load
+    time.sleep(5)
+
+    # Get the page content
+    page_source = driver.page_source
+    driver.quit()
+
+    # Parse the content using BeautifulSoup
+    soup = BeautifulSoup(page_source, 'html.parser')
+    text = soup.get_text(separator="\n")
+    
+    return text
+
+# Chat with Webpage functionality
 def chat_with_webpage():
     st.markdown("<h2 style='color:#fc1008'>Chat with Webpage using Gemini</h2>", unsafe_allow_html=True)
+
+    webpage_url = st.text_input("Enter the URL of the webpage")
+
+    if webpage_url and st.button("Submit & Process Webpage"):
+        with st.spinner("Scraping webpage..."):
+            raw_text = get_webpage_text(webpage_url)
+            text_chunks = get_text_chunks(raw_text)
+            get_vector_store(text_chunks)
+            st.success("Webpage content processed successfully")
 
     user_question = st.text_input("Ask a Question from the Webpage")
 
     if user_question:
-        st.write("Reply: ", "This feature is not implemented yet")
+        user_input(user_question)
 
 # Chat with AI functionality
 def chat_with_ai():
@@ -169,9 +207,6 @@ def main():
                 chat_with_webpage()
             elif selected_option == "Chat with AI":
                 chat_with_ai()
-
-    # Main content
-    #st.write("Welcome to the AI Chat Interface!")
 
 # Run the app
 if __name__ == "__main__":
