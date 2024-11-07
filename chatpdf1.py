@@ -13,11 +13,11 @@ from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
 from bs4 import BeautifulSoup
+#import openai
 import time
 
 # Load environment variables
 load_dotenv()
-os.getenv("GOOGLE_API_KEY")
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
 # Function to extract text from PDF files
@@ -86,24 +86,14 @@ def chat_with_pdf():
 
 # Function to scrape webpage content using Selenium and BeautifulSoup
 def get_webpage_text(url):
-    # Automatically manage ChromeDriver using ChromeDriverManager
     service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service)
-
-    # Load the webpage
     driver.get(url)
-
-    # Allow the page to load
     time.sleep(5)
-
-    # Get the page content
     page_source = driver.page_source
     driver.quit()
-
-    # Parse the content using BeautifulSoup
     soup = BeautifulSoup(page_source, 'html.parser')
     text = soup.get_text(separator="\n")
-    
     return text
 
 # Chat with Webpage functionality
@@ -131,16 +121,21 @@ def chat_with_ai():
     user_question = st.text_input("Ask a Question to the AI")
 
     if user_question:
-        load_dotenv()
-        api_key = os.getenv("GOOGLE_API_KEY")
-        genai.configure(api_key=api_key)
-
         model = genai.GenerativeModel("gemini-pro")
+        
+        # Ensure the chat history is initialized
+        if 'chat_history' not in st.session_state:
+            st.session_state['chat_history'] = []
 
-        chat_history = []
-        if 'chat_history' in st.session_state:
-            chat_history = st.session_state['chat_history']
+        # Prepare chat history with the expected format
+        chat_history = [
+            {"role": "user", "parts": [{"text": message['content']}]}
+            if message['role'] == "You" 
+            else {"role": "model", "parts": [{"text": message['content']}]}
+            for message in st.session_state['chat_history']
+        ]
 
+        # Start a new chat session with the correctly formatted history
         chat = model.start_chat(history=chat_history)
 
         def get_gemini_response(question):
@@ -148,31 +143,47 @@ def chat_with_ai():
             return response
 
         response = get_gemini_response(user_question)
-
-        response_text = ""
-        for chunk in response:
-            response_text += chunk.text
+        response_text = "".join(chunk.text for chunk in response)
 
         st.write("Reply: ", response_text)
 
-        if 'chat_history' not in st.session_state:
-            st.session_state['chat_history'] = []
+        # Append new entries to the chat history in session state
         st.session_state['chat_history'].append({"role": "You", "content": user_question})
         st.session_state['chat_history'].append({"role": "Bot", "content": response_text})
 
+        # Display chat history
         st.subheader("The Chat History is")
         for message in st.session_state['chat_history']:
             st.write(f"{message['role']}: {message['content']}")
+
+
+
+# Function to describe an image based on user prompt
+def describe_image():
+    st.markdown("<h2 style='color:#fc1008'>Describe Uploaded Image</h2>", unsafe_allow_html=True)
+
+    uploaded_image = st.file_uploader("Upload an Image", type=["jpg", "png", "jpeg"])
+
+    if uploaded_image and st.button("Describe Image"):
+        st.warning("Image description update unavailable.")
+
+
+# Function to genraate an uploaded image using AI
+def generate_image():
+    st.markdown("<h2 style='color:#fc1008'>Generate Image using DALL-E</h2>", unsafe_allow_html=True)
+
+    prompt = st.text_input("Enter a prompt for image generation")
+
+    if prompt and st.button("Generate Image"):
+        st.warning("Image generation update unavailable.")
 
 # Main function
 def main():
     st.set_page_config("Chat Options", layout="wide")
 
-    # Sidebar control via session state
     if 'sidebar_state' not in st.session_state:
         st.session_state['sidebar_state'] = 'collapsed'
 
-    # Custom CSS to change sidebar width dynamically
     st.markdown(
         """
         <style>
@@ -187,18 +198,16 @@ def main():
         unsafe_allow_html=True
     )
 
-    # Toggle sidebar button
     if st.button("☰ Smart Ai", key="toggle_sidebar"):
         if st.session_state['sidebar_state'] == 'collapsed':
             st.session_state['sidebar_state'] = 'expanded'
         else:
             st.session_state['sidebar_state'] = 'collapsed'
 
-    # Sidebar appears in expanded or collapsed state
     if st.session_state['sidebar_state'] == 'expanded':
         with st.sidebar:
             st.markdown("<h1 style='color:red'>Menu</h1>", unsafe_allow_html=True)
-            options = ["Chat with PDF", "Chat with Webpage", "Chat with AI"]
+            options = ["Chat with PDF", "Chat with Webpage", "Chat with AI", "Generate Image", "Describe Image"]
             selected_option = st.selectbox("Select an option", options)
 
             if selected_option == "Chat with PDF":
@@ -207,7 +216,10 @@ def main():
                 chat_with_webpage()
             elif selected_option == "Chat with AI":
                 chat_with_ai()
+            elif selected_option == "Generate Image":
+                generate_image()
+            elif selected_option == "Describe Image":
+                describe_image()
 
-# Run the app
 if __name__ == "__main__":
     main()
