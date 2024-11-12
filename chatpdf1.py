@@ -12,8 +12,7 @@ from dotenv import load_dotenv
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
-from bs4 import BeautifulSoup
-#import openai
+from bs4 import BeautifulSoup 
 import time
 
 # Load environment variables
