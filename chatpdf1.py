@@ -12,7 +12,9 @@ from dotenv import load_dotenv
 from selenium import webdriver
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.chrome.service import Service
-from bs4 import BeautifulSoup 
+from bs4 import BeautifulSoup
+#import openai
+import requests
 import time
 
 # Load environment variables
@@ -50,7 +52,7 @@ def get_conversational_chain():
 
     Answer:
     """
-    model = ChatGoogleGenerativeAI(model="gemini-pro", temperature=0.3)
+    model = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", temperature=0.3)
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
     
     chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
@@ -120,7 +122,7 @@ def chat_with_ai():
     user_question = st.text_input("Ask a Question to the AI")
 
     if user_question:
-        model = genai.GenerativeModel("gemini-pro")
+        model = genai.GenerativeModel("gemini-1.5-pro-latest")
         
         # Ensure the chat history is initialized
         if 'chat_history' not in st.session_state:
@@ -157,25 +159,63 @@ def chat_with_ai():
 
 
 
-# Function to describe an image based on user prompt
-def describe_image():
-    st.markdown("<h2 style='color:#fc1008'>Describe Uploaded Image</h2>", unsafe_allow_html=True)
+# Function to generate an emoji sticker using the TraxDinosaur Emoji API
+# Function to generate an emoji sticker using the TraxDinosaur Emoji API
+def generate_emoji():
+    st.markdown("<h2 style='color:#fc1008'>Generate Emoji Sticker</h2>", unsafe_allow_html=True)
 
-    uploaded_image = st.file_uploader("Upload an Image", type=["jpg", "png", "jpeg"])
+    prompt = st.text_input("Enter a prompt for emoji generation")
 
-    if uploaded_image and st.button("Describe Image"):
-        st.warning("Image description update unavailable.")
+    if prompt and st.button("Generate Emoji"):
+        st.warning("Generating emoji, please wait...")
+        
+        # Define the API endpoint and headers
+        api_url = "https://apiemojistrax.onrender.com/api/genemoji"  # Updated API URL
+        headers = {
+            "Content-Type": "application/json"
+        }
+        body = {
+            "prompt": prompt
+        }
 
+        # Send POST request to the API
+        response = requests.post(api_url, headers=headers, json=body)
+
+        if response.status_code == 200:
+            # If the response is successful, display the emoji sticker
+            emoji_image = response.content
+            st.image(emoji_image, caption="Generated Emoji Sticker", use_column_width=True)
+        else:
+            st.error("Error generating emoji: " + response.text)
 
 # Function to genraate an uploaded image using AI
+# Function to generate an uploaded image using AI
 def generate_image():
-    st.markdown("<h2 style='color:#fc1008'>Generate Image using DALL-E</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:#fc1008'>Generate Image using TraxDinosaur API</h2>", unsafe_allow_html=True)
 
     prompt = st.text_input("Enter a prompt for image generation")
 
     if prompt and st.button("Generate Image"):
-        st.warning("Image generation update unavailable.")
+        st.warning("Generating image, please wait...")
+        
+        # Define the API endpoint and headers
+        api_url = "https://apiimagestrax.vercel.app/api/genimage"
+        headers = {
+            "Content-Type": "application/json"
+        }
+        body = {
+            "prompt": prompt
+        }
 
+        # Send POST request to the API
+        response = requests.post(api_url, headers=headers, json=body)
+
+        if response.status_code == 200:
+            # If the response is successful, display the image
+            st.image(response.content, caption="Generated Image", use_column_width=True)
+        else:
+            st.error("Error generating image: " + response.text)
+# Main function
 # Main function
 def main():
     st.set_page_config("Chat Options", layout="wide")
@@ -206,7 +246,7 @@ def main():
     if st.session_state['sidebar_state'] == 'expanded':
         with st.sidebar:
             st.markdown("<h1 style='color:red'>Menu</h1>", unsafe_allow_html=True)
-            options = ["Chat with PDF", "Chat with Webpage", "Chat with AI", "Generate Image", "Describe Image"]
+            options = ["Chat with PDF", "Chat with Webpage", "Chat with AI", "Generate Image", "Generate Emoji"]
             selected_option = st.selectbox("Select an option", options)
 
             if selected_option == "Chat with PDF":
@@ -217,8 +257,8 @@ def main():
                 chat_with_ai()
             elif selected_option == "Generate Image":
                 generate_image()
-            elif selected_option == "Describe Image":
-                describe_image()
+            elif selected_option == "Generate Emoji":
+                generate_emoji()
 
 if __name__ == "__main__":
     main()
